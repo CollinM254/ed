@@ -2095,6 +2095,451 @@ exports.getBulkHistoricalPositions = async (req, res) => {
   }
 };
 
+
+// new previous positions endpoints
+// New optimized endpoint for fetching previous positions
+//  Updated getPreviousExamPositions function
+// exports.getPreviousExamPositions = async (req, res) => {
+//   const { schoolId } = req.params;
+//   const { class: className, currentTerm, currentExamType, currentExamName } = req.query;
+  
+  
+//   try {
+//     console.log('Route params:', req.params);
+//     console.log('Query params:', req.query);
+    
+//     // Convert schoolId to ObjectId
+//     const schoolIdObj = new mongoose.Types.ObjectId(schoolId);
+//     console.log('Converted schoolId to ObjectId:', schoolIdObj);
+
+//     // First, get the creation date of the current exam
+//     const currentExamQuery = {
+//       schoolId: schoolIdObj,
+//       class: className,
+//       'results.term': currentTerm,
+//       'results.examType': currentExamType
+//     };
+
+//     // Handle exam name conditionally
+//     if (currentExamName && (currentExamType === 'Random Exams' || currentExamType === 'Other Exams')) {
+//       currentExamQuery['results.examName'] = currentExamName;
+//     } else {
+//       currentExamQuery['$or'] = [
+//         { 'results.examName': null },
+//         { 'results.examName': '' },
+//         { 'results.examName': { $exists: false } }
+//       ];
+//     }
+
+//     console.log('Current exam query:', currentExamQuery);
+
+//     const currentExam = await Learner.findOne(currentExamQuery, { 'results.$': 1 });
+
+//     if (!currentExam || !currentExam.results.length) {
+//       console.log("Current exam not found with query:", currentExamQuery);
+//       return res.status(200).json({ 
+//         previousPositions: {},
+//         message: "Current exam not found" 
+//       });
+//     }
+
+//     const currentExamDate = currentExam.results[0].createdAt;
+//     console.log("Found current exam with date:", currentExamDate);
+
+//     // Get the previous 4 exams before this date
+//     const previousExams = await Learner.aggregate([
+//       { $match: { schoolId: schoolIdObj, class: className } },
+//       { $unwind: "$results" },
+//       { 
+//         $match: { 
+//           "results.createdAt": { $lt: currentExamDate },
+//           "results.term": { $exists: true },
+//           "results.examType": { $exists: true }
+//         } 
+//       },
+//       {
+//         $group: {
+//           _id: {
+//             term: "$results.term",
+//             examType: "$results.examType",
+//             examName: "$results.examName"
+//           },
+//           createdAt: { $max: "$results.createdAt" },
+//           examCount: { $sum: 1 }
+//         }
+//       },
+//       { $sort: { createdAt: -1 } },
+//       { $limit: 4 },
+//       {
+//         $project: {
+//           term: "$_id.term",
+//           examType: "$_id.examType",
+//           examName: "$_id.examName",
+//           createdAt: 1,
+//           _id: 0
+//         }
+//       }
+//     ]);
+
+//     console.log('Found previous exams:', previousExams.length);
+
+//     if (previousExams.length === 0) {
+//       return res.status(200).json({ previousPositions: {} });
+//     }
+
+//     // For each previous exam, calculate positions for all learners
+//     const positionPromises = previousExams.map(async (exam) => {
+//       const learnersWithTotals = await Learner.aggregate([
+//         { $match: { schoolId: schoolIdObj, class: className } },
+//         { $unwind: "$results" },
+//         {
+//           $match: {
+//             "results.term": exam.term,
+//             "results.examType": exam.examType,
+//             "results.examName": exam.examName || null
+//           }
+//         },
+//         {
+//           $group: {
+//             _id: "$_id",
+//             fullName: { $first: "$fullName" },
+//             total: { $sum: "$results.marks" },
+//             stream: { $first: "$stream" }
+//           }
+//         },
+//         { $match: { total: { $gt: 0 } } },
+//         { $sort: { total: -1 } },
+//         {
+//           $group: {
+//             _id: null,
+//             learners: { $push: "$$ROOT" },
+//             count: { $sum: 1 }
+//           }
+//         },
+//         {
+//           $unwind: {
+//             path: "$learners",
+//             includeArrayIndex: "position"
+//           }
+//         },
+//         {
+//           $project: {
+//             learnerId: "$learners._id",
+//             position: { $add: ["$position", 1] },
+//             total: "$learners.total",
+//             fullName: "$learners.fullName",
+//             stream: "$learners.stream"
+//           }
+//         }
+//       ]);
+
+//       return {
+//         examKey: `${exam.term}-${exam.examType}-${exam.examName || ''}`,
+//         examInfo: exam,
+//         positions: learnersWithTotals.reduce((acc, curr) => {
+//           acc[curr.learnerId.toString()] = curr.position;
+//           return acc;
+//         }, {})
+//       };
+//     });
+
+//     const examPositions = await Promise.all(positionPromises);
+
+//     // Transform into the format we need: { learnerId: { examKey1: position, examKey2: position } }
+//     const previousPositions = {};
+//     examPositions.forEach(examData => {
+//       Object.entries(examData.positions).forEach(([learnerId, position]) => {
+//         if (!previousPositions[learnerId]) {
+//           previousPositions[learnerId] = {};
+//         }
+//         previousPositions[learnerId][examData.examKey] = position;
+//       });
+//     });
+
+//     console.log('Returning previous positions for', Object.keys(previousPositions).length, 'learners');
+//     res.status(200).json({ previousPositions });
+//   } catch (error) {
+//     console.error("Error fetching previous exam positions:", error);
+//     res.status(500).json({ 
+//       message: "Internal server error",
+//       error: error.message 
+//     });
+//   }
+// };
+exports.getPreviousExamPositions = async (req, res) => {
+  const { schoolId } = req.params;
+  const { class: className, currentTerm, currentExamType, currentExamName } = req.query;
+  
+  try {
+    console.log('Route params:', req.params);
+    console.log('Query params:', req.query);
+    
+    // Convert schoolId to ObjectId
+    const schoolIdObj = new mongoose.Types.ObjectId(schoolId);
+    console.log('Converted schoolId to ObjectId:', schoolIdObj);
+
+    // First, get the creation date of the current exam
+    const currentExamQuery = {
+      schoolId: schoolIdObj,
+      class: className,
+      'results.term': currentTerm,
+      'results.examType': currentExamType
+    };
+
+    // Handle exam name conditionally
+    if (currentExamName && (currentExamType === 'Random Exams' || currentExamType === 'Other Exams')) {
+      currentExamQuery['results.examName'] = currentExamName;
+    } else {
+      currentExamQuery['$or'] = [
+        { 'results.examName': null },
+        { 'results.examName': '' },
+        { 'results.examName': { $exists: false } }
+      ];
+    }
+
+    console.log('Current exam query:', currentExamQuery);
+
+    const currentExam = await Learner.findOne(currentExamQuery, { 'results.$': 1 });
+
+    if (!currentExam || !currentExam.results.length) {
+      console.log("Current exam not found with query:", currentExamQuery);
+      return res.status(200).json({ 
+        previousPositions: {},
+        streamPreviousPositions: {},
+        message: "Current exam not found" 
+      });
+    }
+
+    const currentExamDate = currentExam.results[0].createdAt;
+    console.log("Found current exam with date:", currentExamDate);
+
+    // Get the previous 4 exams before this date
+    const previousExams = await Learner.aggregate([
+      { $match: { schoolId: schoolIdObj, class: className } },
+      { $unwind: "$results" },
+      { 
+        $match: { 
+          "results.createdAt": { $lt: currentExamDate },
+          "results.term": { $exists: true },
+          "results.examType": { $exists: true }
+        } 
+      },
+      {
+        $group: {
+          _id: {
+            term: "$results.term",
+            examType: "$results.examType",
+            examName: "$results.examName"
+          },
+          createdAt: { $max: "$results.createdAt" },
+          examCount: { $sum: 1 }
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      { $limit: 4 },
+      {
+        $project: {
+          term: "$_id.term",
+          examType: "$_id.examType",
+          examName: "$_id.examName",
+          createdAt: 1,
+          _id: 0
+        }
+      }
+    ]);
+
+    console.log('Found previous exams:', previousExams.length);
+
+    if (previousExams.length === 0) {
+      return res.status(200).json({ 
+        previousPositions: {},
+        streamPreviousPositions: {}
+      });
+    }
+
+    // For each previous exam, calculate positions for all learners (general positions)
+    const positionPromises = previousExams.map(async (exam) => {
+      const learnersWithTotals = await Learner.aggregate([
+        { $match: { schoolId: schoolIdObj, class: className } },
+        { $unwind: "$results" },
+        {
+          $match: {
+            "results.term": exam.term,
+            "results.examType": exam.examType,
+            "results.examName": exam.examName || null
+          }
+        },
+        {
+          $group: {
+            _id: "$_id",
+            fullName: { $first: "$fullName" },
+            total: { $sum: "$results.marks" },
+            stream: { $first: "$stream" }
+          }
+        },
+        { $match: { total: { $gt: 0 } } },
+        { $sort: { total: -1 } },
+        {
+          $group: {
+            _id: null,
+            learners: { $push: "$$ROOT" },
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $unwind: {
+            path: "$learners",
+            includeArrayIndex: "position"
+          }
+        },
+        {
+          $project: {
+            learnerId: "$learners._id",
+            position: { $add: ["$position", 1] },
+            total: "$learners.total",
+            fullName: "$learners.fullName",
+            stream: "$learners.stream"
+          }
+        }
+      ]);
+
+      return {
+        examKey: `${exam.term}-${exam.examType}-${exam.examName || ''}`,
+        examInfo: exam,
+        positions: learnersWithTotals.reduce((acc, curr) => {
+          acc[curr.learnerId.toString()] = curr.position;
+          return acc;
+        }, {})
+      };
+    });
+
+    // For each previous exam, calculate stream-level positions
+    const streamPositionPromises = previousExams.map(async (exam) => {
+      const streamPositions = {};
+      
+      // For each stream, calculate positions
+      const streams = await Learner.distinct("stream", { 
+        schoolId: schoolIdObj, 
+        class: className 
+      });
+      
+      for (const stream of streams) {
+        const learnersWithTotals = await Learner.aggregate([
+          { 
+            $match: { 
+              schoolId: schoolIdObj, 
+              class: className,
+              stream: stream 
+            } 
+          },
+          { $unwind: "$results" },
+          {
+            $match: {
+              "results.term": exam.term,
+              "results.examType": exam.examType,
+              "results.examName": exam.examName || null
+            }
+          },
+          {
+            $group: {
+              _id: "$_id",
+              fullName: { $first: "$fullName" },
+              total: { $sum: "$results.marks" },
+              stream: { $first: "$stream" }
+            }
+          },
+          { $match: { total: { $gt: 0 } } },
+          { $sort: { total: -1 } },
+          {
+            $group: {
+              _id: null,
+              learners: { $push: "$$ROOT" },
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $unwind: {
+              path: "$learners",
+              includeArrayIndex: "position"
+            }
+          },
+          {
+            $project: {
+              learnerId: "$learners._id",
+              position: { $add: ["$position", 1] },
+              total: "$learners.total",
+              fullName: "$learners.fullName",
+              stream: "$learners.stream"
+            }
+          }
+        ]);
+        
+        if (!streamPositions[stream]) {
+          streamPositions[stream] = {};
+        }
+        
+        learnersWithTotals.forEach(learner => {
+          streamPositions[stream][learner.learnerId.toString()] = learner.position;
+        });
+      }
+      
+      return {
+        examKey: `${exam.term}-${exam.examType}-${exam.examName || ''}`,
+        streamPositions: streamPositions
+      };
+    });
+
+    const [examPositions, streamExamPositions] = await Promise.all([
+      Promise.all(positionPromises),
+      Promise.all(streamPositionPromises)
+    ]);
+
+    // Transform into the format we need: { learnerId: { examKey1: position, examKey2: position } }
+    const previousPositions = {};
+    examPositions.forEach(examData => {
+      Object.entries(examData.positions).forEach(([learnerId, position]) => {
+        if (!previousPositions[learnerId]) {
+          previousPositions[learnerId] = {};
+        }
+        previousPositions[learnerId][examData.examKey] = position;
+      });
+    });
+
+    // Transform stream positions into the format we need
+    const streamPreviousPositions = {};
+    streamExamPositions.forEach(examData => {
+      Object.entries(examData.streamPositions).forEach(([stream, positions]) => {
+        Object.entries(positions).forEach(([learnerId, position]) => {
+          // Create a key that includes both stream and exam info
+          const key = `${examData.examKey}`;
+          if (!streamPreviousPositions[learnerId]) {
+            streamPreviousPositions[learnerId] = {};
+          }
+          // Store both the position and the stream it belongs to
+          streamPreviousPositions[learnerId][key] = {
+            position: position,
+            stream: stream
+          };
+        });
+      });
+    });
+
+    console.log('Returning previous positions for', Object.keys(previousPositions).length, 'learners');
+    console.log('Returning stream previous positions for', Object.keys(streamPreviousPositions).length, 'learners');
+    
+    res.status(200).json({ 
+      previousPositions,
+      streamPreviousPositions 
+    });
+  } catch (error) {
+    console.error("Error fetching previous exam positions:", error);
+    res.status(500).json({ 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+};
+
 //};
 // Combined and optimized createMessage
 exports.createMessage = async (req, res) => {
