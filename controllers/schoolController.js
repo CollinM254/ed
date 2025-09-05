@@ -33,6 +33,7 @@ const { ChartJSNodeCanvas } = require("chartjs-node-canvas");
 const AdminCode = require("../models/AdminCode");
 const jwt = require("jsonwebtoken");
 const secretKey = process.env.JWT_SECRET || "DWEIOJFEIOTUERTDJDFHJKSDGJKGHJKG";
+const UAParser = require('ua-parser-js');
 
 require("dotenv").config();
 
@@ -200,7 +201,363 @@ exports.activateSchool = async (req, res) => {
   }
 };
 
-//// Login School
+// //// Login School
+// // Generate 6-character alphanumeric code in uppercase
+// const generateVerificationCode = () => {
+//   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+//   let code = "";
+//   for (let i = 0; i < 6; i++) {
+//     code += chars.charAt(Math.floor(Math.random() * chars.length));
+//   }
+//   return code;
+// };
+
+// // Send verification email
+// const sendVerificationEmail = async (email, schoolName, code) => {
+//   const mailOptions = {
+//     from: `"School Admin" <${process.env.EMAIL_USER}>`,
+//     to: email,
+//     subject: "Your Login Verification Code",
+//     html: `
+//       <p>Dear ${schoolName},</p>
+//       <p>Your verification code is: <strong>${code}</strong></p>
+//       <p>This code will expire in 10 minutes.</p>
+//       <p>If you did not request this, please secure your account.</p>
+//       <p>Best regards,<br>Kids Matter Team</p>
+//     `,
+//   };
+
+//   return transporter.sendMail(mailOptions);
+// };
+
+// // // Login School
+
+// // Modified loginSchool function to handle both flows
+// exports.loginSchool = async (req, res) => {
+//   const {
+//     email,
+//     schoolCode,
+//     verificationCode: verificationCodeFromRequest,
+//   } = req.body;
+
+//   try {
+//     const cleanEmail = email.trim().toLowerCase();
+//     const cleanSchoolCode = schoolCode.trim();
+
+//     // If verificationCode is provided, handle verification phase
+//     if (verificationCodeFromRequest) {
+//       const cleanCode = verificationCodeFromRequest.trim().toUpperCase();
+//       const school = await School.findOne({ email: cleanEmail });
+
+//       if (!school) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid verification request.",
+//         });
+//       }
+
+//       // Check if code exists and is not expired
+//       if (
+//         !school.verificationCode ||
+//         new Date() > school.verificationCodeExpires
+//       ) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Verification code expired. Please request a new one.",
+//         });
+//       }
+
+//       // Check verification attempts
+//       if (school.verificationAttempts >= 3) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Too many attempts. Please request a new code.",
+//         });
+//       }
+
+//       // Verify the code
+//       if (school.verificationCode !== cleanCode) {
+//         school.verificationAttempts += 1;
+//         await school.save();
+
+//         const attemptsLeft = 3 - school.verificationAttempts;
+//         return res.status(400).json({
+//           success: false,
+//           message: `Invalid verification code. ${
+//             attemptsLeft > 0
+//               ? `${attemptsLeft} attempts remaining`
+//               : "No attempts remaining"
+//           }.`,
+//         });
+//       }
+
+//       // Code is valid - clear verification data
+//       school.verificationCode = undefined;
+//       school.verificationCodeExpires = undefined;
+//       school.verificationAttempts = undefined;
+//       await school.save();
+
+//       // Successful verification
+//       return res.status(200).json({
+//         success: true,
+//         message: "Login successful",
+//         schoolId: school._id,
+//         schoolName: school.schoolName,
+//       });
+//     }
+
+//     // Traditional login flow (first phase - initiate verification)
+//     const school = await School.findOne({ email: cleanEmail });
+
+//     if (!school) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is incorrect.",
+//         requiresVerification: false,
+//       });
+//     }
+
+//     if (school.schoolCode !== cleanSchoolCode) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "School code is incorrect.",
+//         requiresVerification: false,
+//       });
+//     }
+
+//     if (!school.isActive) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Your account is not activated. Please check your email.",
+//         requiresVerification: false,
+//       });
+//     }
+
+//     // Generate and save verification code
+//     const newVerificationCode = generateVerificationCode(); // Changed variable name here
+//     school.verificationCode = newVerificationCode;
+//     school.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+//     school.verificationAttempts = 0;
+//     await school.save();
+
+//     // Send verification email
+//     await sendVerificationEmail(
+//       school.email,
+//       school.schoolName,
+//       newVerificationCode
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Verification code sent to your email",
+//       requiresVerification: true,
+//       email: cleanEmail, // Return email for the next step
+//     });
+//   } catch (error) {
+//     console.error("Error in login process:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error.",
+//     });
+//   }
+// };
+
+
+
+// Simple IP-to-location database (you can expand this as needed)
+
+
+
+// Simple IP-to-location database (you can expand this as needed)
+const ipLocationDatabase = {
+  // Safaricom (Largest mobile provider)
+  '105.0.0.0/8': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Safaricom' },
+  '105.160.0.0/11': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Safaricom' },
+  '105.192.0.0/11': { country: 'KE', city: 'Mombasa', region: 'Mombasa County', isp: 'Safaricom' },
+  '105.224.0.0/11': { country: 'KE', city: 'Kisumu', region: 'Kisumu County', isp: 'Safaricom' },
+  '105.48.0.0/12': { country: 'KE', city: 'Nakuru', region: 'Nakuru County', isp: 'Safaricom' },
+  '105.64.0.0/11': { country: 'KE', city: 'Eldoret', region: 'Uasin Gishu County', isp: 'Safaricom' },
+  
+  // Airtel Kenya
+  '102.0.0.0/8': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Airtel' },
+  '102.128.0.0/11': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Airtel' },
+  '102.176.0.0/12': { country: 'KE', city: 'Mombasa', region: 'Mombasa County', isp: 'Airtel' },
+  '102.208.0.0/12': { country: 'KE', city: 'Kisumu', region: 'Kisumu County', isp: 'Airtel' },
+  '102.32.0.0/13': { country: 'KE', city: 'Nakuru', region: 'Nakuru County', isp: 'Airtel' },
+  '102.68.0.0/14': { country: 'KE', city: 'Eldoret', region: 'Uasin Gishu County', isp: 'Airtel' },
+  '102.0.18.0/24': { country: 'KE', city: 'Kutus', region: 'Kirinyaga County', isp: 'Airtel' },
+  
+  // Telkom Kenya (Orange)
+  '154.0.0.0/8': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Telkom' },
+  '154.64.0.0/11': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Telkom' },
+  '154.112.0.0/12': { country: 'KE', city: 'Mombasa', region: 'Mombasa County', isp: 'Telkom' },
+  '154.160.0.0/11': { country: 'KE', city: 'Kisumu', region: 'Kisumu County', isp: 'Telkom' },
+  '154.208.0.0/12': { country: 'KE', city: 'Nakuru', region: 'Nakuru County', isp: 'Telkom' },
+  '154.240.0.0/12': { country: 'KE', city: 'Eldoret', region: 'Uasin Gishu County', isp: 'Telkom' },
+  
+  // Faiba (JTL)
+  '197.0.0.0/8': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Faiba' },
+  '197.128.0.0/11': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Faiba' },
+  '197.176.0.0/12': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Faiba' },
+  
+  // Internet Solutions Kenya
+  '196.0.0.0/8': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Internet Solutions' },
+  '196.128.0.0/11': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Internet Solutions' },
+  '196.201.0.0/16': { country: 'KE', city: 'Mombasa', region: 'Mombasa County', isp: 'Internet Solutions' },
+  
+  // Wananchi Group (Zuku)
+  '41.0.0.0/8': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Zuku' },
+  '41.80.0.0/13': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Zuku' },
+  '41.88.0.0/14': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Zuku' },
+  
+  // Liquid Telecom
+  '196.216.0.0/14': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Liquid Telecom' },
+  '196.220.0.0/15': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Liquid Telecom' },
+  
+  // Kenya Education Network (KENET)
+  '196.200.0.0/14': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'KENET' },
+  '196.204.0.0/15': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'KENET' },
+  
+  // Regional IP allocations by county
+  
+  // Nairobi County
+  '105.128.0.0/10': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Multiple ISPs' },
+  '102.64.0.0/11': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Multiple ISPs' },
+  '154.32.0.0/11': { country: 'KE', city: 'Nairobi', region: 'Nairobi County', isp: 'Multiple ISPs' },
+  
+  // Mombasa County
+  '105.192.0.0/12': { country: 'KE', city: 'Mombasa', region: 'Mombasa County', isp: 'Multiple ISPs' },
+  '102.144.0.0/12': { country: 'KE', city: 'Mombasa', region: 'Mombasa County', isp: 'Multiple ISPs' },
+  '154.96.0.0/12': { country: 'KE', city: 'Mombasa', region: 'Mombasa County', isp: 'Multiple ISPs' },
+  
+  // Kisumu County
+  '105.224.0.0/12': { country: 'KE', city: 'Kisumu', region: 'Kisumu County', isp: 'Multiple ISPs' },
+  '102.192.0.0/12': { country: 'KE', city: 'Kisumu', region: 'Kisumu County', isp: 'Multiple ISPs' },
+  '154.128.0.0/12': { country: 'KE', city: 'Kisumu', region: 'Kisumu County', isp: 'Multiple ISPs' },
+  
+  // Nakuru County
+  '105.48.0.0/13': { country: 'KE', city: 'Nakuru', region: 'Nakuru County', isp: 'Multiple ISPs' },
+  '102.40.0.0/13': { country: 'KE', city: 'Nakuru', region: 'Nakuru County', isp: 'Multiple ISPs' },
+  '154.200.0.0/13': { country: 'KE', city: 'Nakuru', region: 'Nakuru County', isp: 'Multiple ISPs' },
+  
+  // Uasin Gishu County (Eldoret)
+  '105.64.0.0/12': { country: 'KE', city: 'Eldoret', region: 'Uasin Gishu County', isp: 'Multiple ISPs' },
+  '102.72.0.0/13': { country: 'KE', city: 'Eldoret', region: 'Uasin Gishu County', isp: 'Multiple ISPs' },
+  '154.232.0.0/13': { country: 'KE', city: 'Eldoret', region: 'Uasin Gishu County', isp: 'Multiple ISPs' },
+  
+  // Kiambu County
+  '105.80.0.0/12': { country: 'KE', city: 'Thika', region: 'Kiambu County', isp: 'Multiple ISPs' },
+  '102.96.0.0/12': { country: 'KE', city: 'Kiambu', region: 'Kiambu County', isp: 'Multiple ISPs' },
+  '154.144.0.0/12': { country: 'KE', city: 'Kikuyu', region: 'Kiambu County', isp: 'Multiple ISPs' },
+  
+  // Machakos County
+  '105.96.0.0/12': { country: 'KE', city: 'Machakos', region: 'Machakos County', isp: 'Multiple ISPs' },
+  '102.112.0.0/12': { country: 'KE', city: 'Athi River', region: 'Machakos County', isp: 'Multiple ISPs' },
+  
+  // Meru County
+  '105.112.0.0/12': { country: 'KE', city: 'Meru', region: 'Meru County', isp: 'Multiple ISPs' },
+  '102.128.0.0/12': { country: 'KE', city: 'Meru', region: 'Meru County', isp: 'Multiple ISPs' },
+  
+  // Nyeri County
+  '105.128.0.0/12': { country: 'KE', city: 'Nyeri', region: 'Nyeri County', isp: 'Multiple ISPs' },
+  '102.144.0.0/12': { country: 'KE', city: 'Nyeri', region: 'Nyeri County', isp: 'Multiple ISPs' },
+  
+  // Kakamega County
+  '105.144.0.0/12': { country: 'KE', city: 'Kakamega', region: 'Kakamega County', isp: 'Multiple ISPs' },
+  '102.160.0.0/12': { country: 'KE', city: 'Kakamega', region: 'Kakamega County', isp: 'Multiple ISPs' },
+  
+  // Kisii County
+  '105.160.0.0/12': { country: 'KE', city: 'Kisii', region: 'Kisii County', isp: 'Multiple ISPs' },
+  '102.176.0.0/12': { country: 'KE', city: 'Kisii', region: 'Kisii County', isp: 'Multiple ISPs' },
+  
+  // Kericho County
+  '105.176.0.0/12': { country: 'KE', city: 'Kericho', region: 'Kericho County', isp: 'Multiple ISPs' },
+  '102.192.0.0/12': { country: 'KE', city: 'Kericho', region: 'Kericho County', isp: 'Multiple ISPs' },
+  
+  // Bungoma County
+  '105.192.0.0/12': { country: 'KE', city: 'Bungoma', region: 'Bungoma County', isp: 'Multiple ISPs' },
+  '102.208.0.0/12': { country: 'KE', city: 'Bungoma', region: 'Bungoma County', isp: 'Multiple ISPs' },
+  
+  // Embu County
+  '105.208.0.0/12': { country: 'KE', city: 'Embu', region: 'Embu County', isp: 'Multiple ISPs' },
+  '102.224.0.0/12': { country: 'KE', city: 'Embu', region: 'Embu County', isp: 'Multiple ISPs' },
+  
+  // Kilifi County (Malindi)
+  '105.224.0.0/12': { country: 'KE', city: 'Malindi', region: 'Kilifi County', isp: 'Multiple ISPs' },
+  '102.240.0.0/12': { country: 'KE', city: 'Kilifi', region: 'Kilifi County', isp: 'Multiple ISPs' },
+  
+  // Kitui County
+  '105.240.0.0/12': { country: 'KE', city: 'Kitui', region: 'Kitui County', isp: 'Multiple ISPs' },
+  '102.0.0.0/12': { country: 'KE', city: 'Kitui', region: 'Kitui County', isp: 'Multiple ISPs' },
+  
+  // Garissa County
+  '154.0.0.0/12': { country: 'KE', city: 'Garissa', region: 'Garissa County', isp: 'Multiple ISPs' },
+  '154.16.0.0/12': { country: 'KE', city: 'Garissa', region: 'Garissa County', isp: 'Multiple ISPs' },
+  
+  // Private networks (keep these at the end for fallback)
+  '192.168.0.0/16': { country: 'LAN', city: 'Local Network', region: 'Internal', isp: 'Private' },
+  '10.0.0.0/8': { country: 'LAN', city: 'Local Network', region: 'Internal', isp: 'Private' },
+  '172.16.0.0/12': { country: 'LAN', city: 'Local Network', region: 'Internal', isp: 'Private' },
+  '127.0.0.0/8': { country: 'LOCAL', city: 'Localhost', region: 'Loopback', isp: 'Local' },
+};
+
+
+
+// Helper function to check if an IP is in a CIDR range
+// Helper function to check if an IP is in a CIDR range
+const isIPInCIDR = (ip, cidr) => {
+  const [range, bits] = cidr.split('/');
+  const mask = ~((1 << (32 - parseInt(bits))) - 1);
+  const ipLong = ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0);
+  const rangeLong = range.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0);
+  
+  return (ipLong & mask) === (rangeLong & mask);
+};
+
+// Helper function to get location from IP using the local database
+const getLocationFromIP = (ip) => {
+  for (const [cidr, location] of Object.entries(ipLocationDatabase)) {
+    if (isIPInCIDR(ip, cidr)) {
+      return `${location.city}, ${location.region}, ${location.country}${location.isp ? ` (${location.isp})` : ''}`;
+    }
+  }
+  
+  // If no match found, return the IP with a generic message
+  return `Unknown Location (IP: ${ip})`;
+};
+
+// Helper function to get device info from user agent
+const getDeviceInfo = (userAgent) => {
+  const parser = new UAParser(userAgent);
+  const result = parser.getResult();
+  
+  const deviceType = result.device.type || 'desktop';
+  const deviceModel = result.device.model || '';
+  const os = result.os.name || 'Unknown OS';
+  const browser = result.browser.name || 'Unknown Browser';
+  
+  return `${deviceType}${deviceModel ? ' ' + deviceModel : ''} (${os}, ${browser})`;
+};
+
+// Helper function to get current time in East Africa Time (Nairobi)
+const getCurrentEATTime = () => {
+  const now = new Date();
+  
+  // East Africa Time is UTC+3
+  // Convert current time to EAT by adding 3 hours
+  const eatTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+  
+  // Format the date manually to ensure correct display
+  const year = eatTime.getUTCFullYear();
+  const month = String(eatTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(eatTime.getUTCDate()).padStart(2, '0');
+  const hours = String(eatTime.getUTCHours()).padStart(2, '0');
+  const minutes = String(eatTime.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(eatTime.getUTCSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} (EAT)`;
+};
+
 // Generate 6-character alphanumeric code in uppercase
 const generateVerificationCode = () => {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -211,8 +568,8 @@ const generateVerificationCode = () => {
   return code;
 };
 
-// Send verification email
-const sendVerificationEmail = async (email, schoolName, code) => {
+// Send verification email with audit information
+const sendVerificationEmail = async (email, schoolName, code, auditInfo) => {
   const mailOptions = {
     from: `"School Admin" <${process.env.EMAIL_USER}>`,
     to: email,
@@ -221,75 +578,95 @@ const sendVerificationEmail = async (email, schoolName, code) => {
       <p>Dear ${schoolName},</p>
       <p>Your verification code is: <strong>${code}</strong></p>
       <p>This code will expire in 10 minutes.</p>
+      <p>Login attempt details:</p>
+      <ul>
+        <li>Time: ${auditInfo.time}</li>
+        <li>Device: ${auditInfo.device}</li>
+        <li>IP Address: ${auditInfo.ip}</li>
+        <li>Location: ${auditInfo.location}</li>
+      </ul>
       <p>If you did not request this, please secure your account.</p>
-      <p>Best regards,<br>Kids Matter Team</p>
+      <p>Best regards,<br>KidsEdu Team</p>
     `,
   };
 
   return transporter.sendMail(mailOptions);
 };
 
-// // Login School
-// exports.loginSchool = async (req, res) => {
-//   const { email, schoolCode } = req.body;
+// Function to get the real client IP address
+const getClientIP = (req) => {
+  // Try getting IP from common proxy headers
+  const headersToCheck = [
+    'x-client-ip',
+    'x-forwarded-for',
+    'cf-connecting-ip', // Cloudflare
+    'fastly-client-ip', // Fastly
+    'true-client-ip', // Akamai and Cloudflare
+    'x-real-ip', // Nginx
+    'x-cluster-client-ip', // Rackspace LB, Riverbed Stingray
+    'x-forwarded',
+    'forwarded-for',
+    'forwarded'
+  ];
+  
+  let clientIP = null;
+  
+  // Check each header
+  for (const header of headersToCheck) {
+    const value = req.headers[header];
+    if (value) {
+      // x-forwarded-for can contain multiple IPs (client, proxy1, proxy2)
+      if (header === 'x-forwarded-for') {
+        const ips = value.split(',');
+        clientIP = ips[0].trim();
+      } else {
+        clientIP = value;
+      }
+      
+      // Validate IP format
+      if (isValidIP(clientIP)) {
+        return clientIP;
+      }
+    }
+  }
+  
+  // Fallback to direct connection IP
+  clientIP = req.connection.remoteAddress || 
+             req.socket.remoteAddress ||
+             (req.connection.socket ? req.connection.socket.remoteAddress : null);
+  
+  // Handle IPv6 format and remove prefix if present
+  if (clientIP && clientIP.substr(0, 7) === "::ffff:") {
+    clientIP = clientIP.substr(7);
+  }
+  
+  return clientIP || 'Unknown IP';
+};
 
-//   // Debug logging
-//   console.log("Login attempt:", { email, schoolCode });
+// Helper function to validate IP address format
+const isValidIP = (ip) => {
+  if (!ip) return false;
+  
+  // Check IPv4 format
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipv4Regex.test(ip)) {
+    const parts = ip.split('.');
+    return parts.every(part => {
+      const num = parseInt(part, 10);
+      return num >= 0 && num <= 255;
+    });
+  }
+  
+  // Check IPv6 format (simplified check)
+  const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+  if (ipv6Regex.test(ip)) {
+    return true;
+  }
+  
+  return false;
+};
 
-//   try {
-//     // Trim and clean inputs
-//     const cleanEmail = email.trim().toLowerCase();
-//     const cleanSchoolCode = schoolCode.trim();
-
-//     const school = await School.findOne({ email: cleanEmail });
-
-//     // Debug logging
-//     console.log(
-//       "Found school:",
-//       school
-//         ? {
-//             _id: school._id,
-//             email: school.email,
-//             schoolCode: school.schoolCode,
-//             isActive: school.isActive,
-//           }
-//         : "No school found"
-//     );
-
-//     if (!school) {
-//       console.log("Login failed: Email not found");
-//       return res.status(400).json({ message: "Email is incorrect." });
-//     }
-
-//     if (school.schoolCode !== cleanSchoolCode) {
-//       console.log("Login failed: School code mismatch", {
-//         inputCode: cleanSchoolCode,
-//         dbCode: school.schoolCode,
-//       });
-//       return res.status(400).json({ message: "School code is incorrect." });
-//     }
-
-//     if (!school.isActive) {
-//       console.log("Login failed: Account not active");
-//       return res
-//         .status(400)
-//         .json({
-//           message: "Your account is not activated. Please check your email.",
-//         });
-//     }
-
-//     console.log("Login successful for school:", school._id);
-//     res.status(200).json({
-//       message: "Login successful",
-//       schoolId: school._id,
-//       schoolName: school.schoolName, // Include school name in response
-//     });
-//   } catch (error) {
-//     console.error("Error logging in:", error);
-//     res.status(500).json({ message: "Internal server error." });
-//   }
-// };
-// Modified loginSchool function to handle both flows
+// Login School function
 exports.loginSchool = async (req, res) => {
   const {
     email,
@@ -300,6 +677,20 @@ exports.loginSchool = async (req, res) => {
   try {
     const cleanEmail = email.trim().toLowerCase();
     const cleanSchoolCode = schoolCode.trim();
+
+    // Get client IP address using the enhanced function
+    const userIP = getClientIP(req);
+    
+    // Get user agent
+    const userAgent = req.get('User-Agent') || 'Unknown Device';
+    
+    // Prepare audit info with EAT time
+    const auditInfo = {
+      time: getCurrentEATTime(),
+      device: getDeviceInfo(userAgent),
+      ip: userIP,
+      location: getLocationFromIP(userIP)
+    };
 
     // If verificationCode is provided, handle verification phase
     if (verificationCodeFromRequest) {
@@ -391,17 +782,18 @@ exports.loginSchool = async (req, res) => {
     }
 
     // Generate and save verification code
-    const newVerificationCode = generateVerificationCode(); // Changed variable name here
+    const newVerificationCode = generateVerificationCode();
     school.verificationCode = newVerificationCode;
     school.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     school.verificationAttempts = 0;
     await school.save();
 
-    // Send verification email
+    // Send verification email with audit info
     await sendVerificationEmail(
       school.email,
       school.schoolName,
-      newVerificationCode
+      newVerificationCode,
+      auditInfo
     );
 
     return res.status(200).json({
@@ -2271,12 +2663,12 @@ exports.getPreviousExamPositions = async (req, res) => {
   const { class: className, currentTerm, currentExamType, currentExamName } = req.query;
   
   try {
-    console.log('Route params:', req.params);
-    console.log('Query params:', req.query);
+    // console.log('Route params:', req.params);
+    // console.log('Query params:', req.query);
     
     // Convert schoolId to ObjectId
     const schoolIdObj = new mongoose.Types.ObjectId(schoolId);
-    console.log('Converted schoolId to ObjectId:', schoolIdObj);
+    // console.log('Converted schoolId to ObjectId:', schoolIdObj);
 
     // First, get the creation date of the current exam
     const currentExamQuery = {
@@ -2297,12 +2689,12 @@ exports.getPreviousExamPositions = async (req, res) => {
       ];
     }
 
-    console.log('Current exam query:', currentExamQuery);
+    // console.log('Current exam query:', currentExamQuery);
 
     const currentExam = await Learner.findOne(currentExamQuery, { 'results.$': 1 });
 
     if (!currentExam || !currentExam.results.length) {
-      console.log("Current exam not found with query:", currentExamQuery);
+      // console.log("Current exam not found with query:", currentExamQuery);
       return res.status(200).json({ 
         previousPositions: {},
         streamPreviousPositions: {},
@@ -2311,7 +2703,7 @@ exports.getPreviousExamPositions = async (req, res) => {
     }
 
     const currentExamDate = currentExam.results[0].createdAt;
-    console.log("Found current exam with date:", currentExamDate);
+    // console.log("Found current exam with date:", currentExamDate);
 
     // Get the previous 4 exams before this date
     const previousExams = await Learner.aggregate([
@@ -2348,7 +2740,7 @@ exports.getPreviousExamPositions = async (req, res) => {
       }
     ]);
 
-    console.log('Found previous exams:', previousExams.length);
+    // console.log('Found previous exams:', previousExams.length);
 
     if (previousExams.length === 0) {
       return res.status(200).json({ 
@@ -2524,8 +2916,8 @@ exports.getPreviousExamPositions = async (req, res) => {
       });
     });
 
-    console.log('Returning previous positions for', Object.keys(previousPositions).length, 'learners');
-    console.log('Returning stream previous positions for', Object.keys(streamPreviousPositions).length, 'learners');
+    // console.log('Returning previous positions for', Object.keys(previousPositions).length, 'learners');
+    // console.log('Returning stream previous positions for', Object.keys(streamPreviousPositions).length, 'learners');
     
     res.status(200).json({ 
       previousPositions,
@@ -2882,6 +3274,11 @@ exports.updateTransferRequestStatus = async (req, res) => {
   }
 };
 
+
+
+
+
+
 // Get performance data for all learners in school
 exports.getSchoolPerformance = async (req, res) => {
   const { schoolId } = req.params;
@@ -2907,7 +3304,7 @@ exports.getFilteredSchoolPerformance = async (req, res) => {
   const { class: className, term, examType, examName } = req.query;
 
   try {
-    console.log('Filtered performance request:', { schoolId, className, term, examType, examName });
+    // console.log('Filtered performance request:', { schoolId, className, term, examType, examName });
 
     // Build the query - FIXED: Use proper ObjectId conversion
     const query = { 
@@ -2929,16 +3326,16 @@ exports.getFilteredSchoolPerformance = async (req, res) => {
       ];
     }
 
-    console.log('Database query:', JSON.stringify(query, null, 2));
+    // console.log('Database query:', JSON.stringify(query, null, 2));
 
     // Fetch learners with matching results
     const learners = await Learner.find(query).select('fullName class results');
 
-    console.log('Filtered learners count:', learners.length);
+    // console.log('Filtered learners count:', learners.length);
     if (learners.length > 0) {
-      console.log('Sample learner data:', learners[0]);
+      // console.log('Sample learner data:', learners[0]);
     } else {
-      console.log('No learners found with the specified criteria');
+      // console.log('No learners found with the specified criteria');
       
       // Let's debug what data actually exists
       const debugQuery = { 
@@ -2946,14 +3343,14 @@ exports.getFilteredSchoolPerformance = async (req, res) => {
         class: className
       };
       const allClassLearners = await Learner.find(debugQuery).select('fullName results');
-      console.log(`Total learners in class ${className}:`, allClassLearners.length);
+      // console.log(`Total learners in class ${className}:`, allClassLearners.length);
       
       if (allClassLearners.length > 0) {
-        console.log('Sample learner with results:', {
-          name: allClassLearners[0].fullName,
-          resultsCount: allClassLearners[0].results.length,
-          results: allClassLearners[0].results
-        });
+        // console.log('Sample learner with results:', {
+        //   name: allClassLearners[0].fullName,
+        //   resultsCount: allClassLearners[0].results.length,
+        //   results: allClassLearners[0].results
+        // });
       }
     }
     
@@ -3020,6 +3417,7 @@ exports.getPerformanceExamTypes = async (req, res) => {
   }
 };
 
+
 // Get available exam names for a class, term, and exam type
 exports.getPerformanceExamNames = async (req, res) => {
   const { schoolId } = req.params;
@@ -3037,6 +3435,133 @@ exports.getPerformanceExamNames = async (req, res) => {
   } catch (error) {
     console.error("Error fetching exam names:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+// Get combined term performance (all exams in a term) - FIXED VERSION
+// Get combined term performance (all exams in a term) - CORRECTED VERSION
+exports.getTermPerformance = async (req, res) => {
+  const { schoolId } = req.params;
+  const { class: className, term } = req.query;
+
+  try {
+    // console.log('Term performance request:', { schoolId, className, term });
+
+    // Fetch learners with results for the specified term
+    const learners = await Learner.find({ 
+      schoolId: new mongoose.Types.ObjectId(schoolId),
+      class: className,
+      'results.term': term
+    }).select('fullName class results stream');
+
+    // console.log(`Found ${learners.length} learners for term ${term}`);
+
+    // Organize data in the format expected by the frontend
+    const organizedData = {
+      learners: [],
+      subjects: new Set(),
+      overallTotal: 0,
+      overallAverage: 0,
+      examCount: 0
+    };
+
+    learners.forEach(learner => {
+      // Filter results for the specific term
+      const termResults = learner.results.filter(result => result.term === term);
+      
+      // Create learner entry
+      const learnerEntry = {
+        learnerId: learner._id,
+        learnerName: learner.fullName,
+        stream: learner.stream,
+        marks: {},
+        total: 0,
+        mean: 0
+      };
+
+      // Calculate totals across all exams in the term
+      let learnerTotal = 0;
+      let subjectCount = 0;
+      
+      // Group marks by subject across all exams
+      const subjectMarks = {};
+      
+      termResults.forEach(result => {
+        // Check if we have a valid subject and mark
+        if (result.subject && result.marks !== undefined && result.marks !== null) {
+          const subject = result.subject;
+          const numericMark = Number(result.marks);
+          
+          if (!isNaN(numericMark) && numericMark > 0) {
+            // Add to subject set
+            organizedData.subjects.add(subject);
+            
+            // Initialize subject tracking if not exists
+            if (!subjectMarks[subject]) {
+              subjectMarks[subject] = {
+                total: 0,
+                count: 0,
+                average: 0
+              };
+            }
+            
+            // Add to subject totals
+            subjectMarks[subject].total += numericMark;
+            subjectMarks[subject].count += 1;
+            subjectMarks[subject].average = 
+              subjectMarks[subject].total / subjectMarks[subject].count;
+            
+            learnerTotal += numericMark;
+            subjectCount++;
+          }
+        }
+      });
+
+      // Convert subject marks to simple average values
+      Object.keys(subjectMarks).forEach(subject => {
+        learnerEntry.marks[subject] = parseFloat(subjectMarks[subject].average.toFixed(2));
+      });
+
+      // Set final values
+      learnerEntry.total = learnerTotal;
+      learnerEntry.mean = subjectCount > 0 ? parseFloat((learnerTotal / subjectCount).toFixed(2)) : 0;
+      
+      organizedData.learners.push(learnerEntry);
+      organizedData.overallTotal += learnerTotal;
+      organizedData.examCount = Math.max(organizedData.examCount, termResults.length);
+    });
+
+    // Calculate overall average
+    const totalMarks = organizedData.learners.reduce((sum, learner) => sum + learner.total, 0);
+    const totalSubjects = organizedData.learners.reduce((sum, learner) => {
+      return sum + Object.keys(learner.marks).length;
+    }, 0);
+    
+    organizedData.overallAverage = totalSubjects > 0 ? 
+      parseFloat((totalMarks / totalSubjects).toFixed(2)) : 0;
+
+    // Convert subjects Set to Array
+    organizedData.subjects = Array.from(organizedData.subjects);
+
+    // console.log('Term performance data prepared:', {
+    //   learnersCount: organizedData.learners.length,
+    //   subjectsCount: organizedData.subjects.length,
+    //   overallAverage: organizedData.overallAverage,
+    //   sampleLearner: organizedData.learners.length > 0 ? {
+    //     name: organizedData.learners[0].learnerName,
+    //     marks: organizedData.learners[0].marks,
+    //     total: organizedData.learners[0].total
+    //   } : 'No learners'
+    // });
+
+    res.status(200).json(organizedData);
+  } catch (error) {
+    console.error("Error fetching term performance data:", error);
+    res.status(500).json({ 
+      message: "Internal server error",
+      error: error.message 
+    });
   }
 };
 

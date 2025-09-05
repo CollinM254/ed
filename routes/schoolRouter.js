@@ -109,6 +109,8 @@ router.get(
   schoolController.getFilteredSchoolPerformance
 );
 
+// Add this to your routes
+router.get('/:schoolId/performance/term', schoolController.getTermPerformance);
 // ========================
 // Assignment Routes
 // ========================
